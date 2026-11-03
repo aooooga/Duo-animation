@@ -4,10 +4,11 @@ A quality-focused fork of [Atomicx7/Duo-animation](https://github.com/Atomicx7/D
 based on upstream commit `8e5be09463d05018b2716065ec913c8cdd697f11`.
 The goal is accurate, stable motion and correctly scaled glass on the owner's
 POCO X7 Pro, rather than lowering rendering quality for a higher frame rate.
-The fold responds on both axes at once and rotates the glass about the screen
-centre, matching a rigid phone turned in the hand, so small movements produce a
-small symmetric parallax instead of a full-screen hinge flip. Every optical and
-motion value is adjustable in Settings.
+The fold responds on both axes at once and combines the two measured tilts into
+one exact rotation about the screen centre, matching a rigid phone turned in the
+hand. The projection is a true inverse perspective, with a **Perspective**
+strength control that scales the compensation without turning it into a
+translation. Every optical and motion value is adjustable in Settings.
 
 ## Hardware verified
 
@@ -42,6 +43,8 @@ swap, compass offset or gyro sensitivity multiplier is applied.
 | Shader compiled for every tilt update; failures silently show plain content | One shader per layer, new uniform snapshots; visible compilation error |
 | Fold only around a vertical edge (left/right motion) | Horizontal and vertical tilt fold simultaneously about the screen centre, so the near and far halves shift in opposite directions |
 | Edge-hinged geometry enlarged every small rotation and flipped the hinge as tilt crossed zero | Centre rotation keeps the displacement proportional to the angle and continuous through neutral |
+| Independent per-axis `cos`/`sin` scaling did not compose into a rigid rotation, so diagonal tilts were geometrically wrong | The two measured angles are combined into one exact 3D rotation before projection |
+| The projective warp could only be accepted at full strength or replaced with a translation | Perspective scales the same projective transform from frost-only (0) to exact compensation (1) |
 
 Physical xdpi scaling was already present upstream and is retained. The rodin
 fallback uses its measured physical DPI only if firmware supplies an invalid
@@ -65,12 +68,15 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Open **DuoFold**, hold the phone in the desired neutral pose, and tap **Calibrate**.
 Tilt it along either axis or diagonally to open the glass. Settings expose every
-value: manual horizontal and vertical tilt, viewing distance, blur spread,
-darkening, physical pixel pitch (auto or manual), maximum tilt, smoothing,
-prediction, sensor/manual mode and optional near-neutral drift correction, plus
-live sensor diagnostics and a reset button. Each manual slider can be left at
-zero to isolate a single axis. The window requests up to 120 Hz; HyperOS retains
-control over refresh rate, power and thermal policy.
+value: manual horizontal and vertical tilt, viewing distance, perspective
+compensation, blur spread, darkening, physical pixel pitch (auto or manual),
+maximum tilt, smoothing, prediction, sensor/manual mode and optional
+near-neutral drift correction, plus live sensor diagnostics and a reset button.
+Each manual slider can be left at zero to isolate a single axis. **Perspective**
+ranges from 0 (frost only, no geometric warp) to 1 (exact inverse perspective);
+the default 0.6 keeps the compensation visible without exaggerating small hand
+movements. The window requests up to 120 Hz; HyperOS retains control over
+refresh rate, power and thermal policy.
 
 This is an app-local demo, not a launcher/SystemUI modification. It requires no
 root, privileged sensor permissions or global phone settings changes.

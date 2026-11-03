@@ -17,10 +17,16 @@ package com.example.duofold.ui
  *   the glass, the darker it gets. Authored at the 6 units/mm reference
  *   density of the original; [foldEffect] normalizes it by the real display
  *   density so the look matches iOS on any screen.
+ * @param perspective Strength of the geometric tilt compensation, 0..1. 1 is
+ *   the exact inverse perspective that keeps content fixed in world space; 0
+ *   leaves the content unwarped and keeps only the frost optics. Values in
+ *   between scale the same projective transform, so the effect never turns
+ *   into a translation.
  */
 data class FoldParameters(
     val eyeDistanceMillimeters: Float = 450f,
     val pixelsPerMillimeter: Float = 0f, // 0 = auto-resolve from display metrics
     val blurSpread: Float = 0.12f,
-    val darkening: Float = 0.015f
+    val darkening: Float = 0.015f,
+    val perspective: Float = 0.6f
 )

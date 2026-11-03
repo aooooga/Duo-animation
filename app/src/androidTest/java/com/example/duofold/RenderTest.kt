@@ -21,7 +21,12 @@ import java.io.File
 /** Real GPU rendering at native panel resolution, including with display off. */
 @RunWith(AndroidJUnit4::class)
 class RenderTest {
-    private data class Shot(val horizontal: Float, val vertical: Float, val name: String)
+    private data class Shot(
+        val horizontal: Float,
+        val vertical: Float,
+        val name: String,
+        val perspective: Float = 0.6f
+    )
 
     @Test fun rendersBothAxesOnDeviceGpu() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -50,11 +55,14 @@ class RenderTest {
             Shot(5f, 0f, "horizontal_5"),
             Shot(-30f, 0f, "horizontal_-30"),
             Shot(30f, 0f, "horizontal_30"),
+            Shot(30f, 0f, "horizontal_30_full", perspective = 1f),
             Shot(0f, 5f, "vertical_5"),
             Shot(0f, 30f, "vertical_30"),
             Shot(0f, -30f, "vertical_-30"),
+            Shot(0f, 30f, "vertical_30_frost_only", perspective = 0f),
             Shot(3f, 2f, "diagonal_3_2"),
             Shot(30f, 20f, "diagonal_30_20"),
+            Shot(30f, 20f, "diagonal_30_20_full", perspective = 1f),
             Shot(-30f, -20f, "diagonal_-30_-20"),
             Shot(30f, -20f, "diagonal_30_-20"),
             Shot(45f, 45f, "diagonal_45_45")
@@ -70,6 +78,7 @@ class RenderTest {
                 shader.setFloatUniform("tiltVerticalDegrees", shot.vertical)
                 shader.setFloatUniform("eyeDistancePx", 450f * 445.61404f / 25.4f)
                 shader.setFloatUniform("maxTiltDegrees", 45f)
+                shader.setFloatUniform("perspective", shot.perspective)
                 shader.setFloatUniform("blurSpread", 0.12f)
                 shader.setFloatUniform("darkening", 0.015f * 6f * 25.4f / 445.61404f)
                 scene.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))

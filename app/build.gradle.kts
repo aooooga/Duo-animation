@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.duofold"
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.4-poco"
+        versionCode = 7
+        versionName = "1.6-poco"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

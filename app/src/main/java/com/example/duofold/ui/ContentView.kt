@@ -38,7 +38,8 @@ import com.example.duofold.sensors.FoldMotionModel
 /**
  * Composition root: [DemoContentView] wrapped in [foldEffect], with every
  * optical and motion value exposed in Settings. Both axes fold at once about
- * the screen centre, matching a rigid phone rotated in the hand.
+ * the screen centre as one rigid rotation, matching a phone turned in the hand;
+ * Perspective scales the projective tilt compensation without replacing it.
  */
 @Composable
 fun ContentView(motionModel: FoldMotionModel) {
@@ -60,6 +61,7 @@ fun ContentView(motionModel: FoldMotionModel) {
     var predictionMs by rememberSaveable { mutableFloatStateOf(25f) }
     var blurSpread by rememberSaveable { mutableFloatStateOf(0.12f) }
     var darkening by rememberSaveable { mutableFloatStateOf(0.015f) }
+    var perspective by rememberSaveable { mutableFloatStateOf(0.6f) }
     var autoPitch by rememberSaveable { mutableStateOf(true) }
     var pitchOverride by rememberSaveable { mutableFloatStateOf(displayPitch) }
     // Default to manual control when no rotation-vector sensor exists.
@@ -80,12 +82,13 @@ fun ContentView(motionModel: FoldMotionModel) {
     val awayHorizontal = if (horizontal >= 0f) "right" else "left"
     val awayVertical = if (vertical >= 0f) "bottom" else "top"
 
-    val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening) {
+    val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening, perspective) {
         FoldParameters(
             eyeDistanceMillimeters = viewingDistance,
             pixelsPerMillimeter = if (autoPitch) 0f else pitchOverride,
             blurSpread = blurSpread,
-            darkening = darkening
+            darkening = darkening,
+            perspective = perspective
         )
     }
 
@@ -144,7 +147,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            "The glass rotates about its centre; both axes combine and the near/far halves shift in opposite directions.",
+                            "The glass rotates about its centre; both axes combine into one rigid rotation. Perspective scales how strongly the projection compensates the phone's tilt.",
                             style = MaterialTheme.typography.labelSmall
                         )
 
@@ -173,6 +176,16 @@ fun ContentView(motionModel: FoldMotionModel) {
                             200f..2000f,
                             "%.0f mm".format(viewingDistance)
                         ) { viewingDistance = it }
+                        TuningSlider(
+                            "Perspective",
+                            perspective,
+                            0f..1f,
+                            "%.2f".format(perspective)
+                        ) { perspective = it }
+                        Text(
+                            "1.00 is full tilt compensation; 0 keeps only the frost.",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                         TuningSlider(
                             "Blur spread",
                             blurSpread,
@@ -264,6 +277,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                                     predictionMs = 25f
                                     blurSpread = 0.12f
                                     darkening = 0.015f
+                                    perspective = 0.6f
                                     autoPitch = true
                                     pitchOverride = displayPitch
                                     autoRecenter = false

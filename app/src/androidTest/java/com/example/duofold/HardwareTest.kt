@@ -26,15 +26,18 @@ class HardwareTest {
         val source = context.resources.openRawResource(R.raw.duo_fold).bufferedReader().use { it.readText() }
         // Single-axis and diagonal pairs; every combination must bind all uniforms.
         for ((horizontal, vertical) in listOf(30f to 0f, 0f to 30f, 30f to 20f, -30f to -20f)) {
-            val shader = RuntimeShader(source)
-            shader.setFloatUniform("resolution", 1220f, 2712f)
-            shader.setFloatUniform("tiltHorizontalDegrees", horizontal)
-            shader.setFloatUniform("tiltVerticalDegrees", vertical)
-            shader.setFloatUniform("eyeDistancePx", 7895f)
-            shader.setFloatUniform("maxTiltDegrees", 45f)
-            shader.setFloatUniform("blurSpread", 0.12f)
-            shader.setFloatUniform("darkening", 0.00513f)
-            assertNotNull(RenderEffect.createRuntimeShaderEffect(shader, "content"))
+            for (perspective in listOf(0f, 0.6f, 1f)) {
+                val shader = RuntimeShader(source)
+                shader.setFloatUniform("resolution", 1220f, 2712f)
+                shader.setFloatUniform("tiltHorizontalDegrees", horizontal)
+                shader.setFloatUniform("tiltVerticalDegrees", vertical)
+                shader.setFloatUniform("eyeDistancePx", 7895f)
+                shader.setFloatUniform("maxTiltDegrees", 45f)
+                shader.setFloatUniform("perspective", perspective)
+                shader.setFloatUniform("blurSpread", 0.12f)
+                shader.setFloatUniform("darkening", 0.00513f)
+                assertNotNull(RenderEffect.createRuntimeShaderEffect(shader, "content"))
+            }
         }
     }
 
