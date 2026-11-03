@@ -32,7 +32,6 @@ class HardwareTest {
             shader.setFloatUniform("tiltVerticalDegrees", vertical)
             shader.setFloatUniform("eyeDistancePx", 7895f)
             shader.setFloatUniform("maxTiltDegrees", 45f)
-            shader.setFloatUniform("parallax", 0.02f)
             shader.setFloatUniform("blurSpread", 0.12f)
             shader.setFloatUniform("darkening", 0.00513f)
             assertNotNull(RenderEffect.createRuntimeShaderEffect(shader, "content"))

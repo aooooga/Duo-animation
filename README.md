@@ -5,9 +5,8 @@ based on upstream commit `8e5be09463d05018b2716065ec913c8cdd697f11`.
 The goal is accurate, stable motion and correctly scaled glass on the owner's
 POCO X7 Pro, rather than lowering rendering quality for a higher frame rate.
 The fold responds on both axes at once and rotates the glass about the screen
-centre, matching a rigid phone turned in the hand. Rotation slides the content
-across the glass as parallax instead of rescaling it, so there is no squash or
-stretch; the near and far halves still frost symmetrically. Every optical and
+centre, matching a rigid phone turned in the hand, so small movements produce a
+small symmetric parallax instead of a full-screen hinge flip. Every optical and
 motion value is adjustable in Settings.
 
 ## Hardware verified
@@ -41,9 +40,8 @@ swap, compass offset or gyro sensitivity multiplier is applied.
 | Out-of-layer shader samples can clamp edge pixels | Explicit opaque-black miss samples match the documented optical model |
 | Fractional blur tap count can put samples outside its intended radius | Full 32-point disk for every visible blur kernel, without a quality reduction |
 | Shader compiled for every tilt update; failures silently show plain content | One shader per layer, new uniform snapshots; visible compilation error |
-| Fold only around a vertical edge (left/right motion) | Horizontal and vertical tilt fold simultaneously about the screen centre; the near and far halves frost in opposite directions |
+| Fold only around a vertical edge (left/right motion) | Horizontal and vertical tilt fold simultaneously about the screen centre, so the near and far halves shift in opposite directions |
 | Edge-hinged geometry enlarged every small rotation and flipped the hinge as tilt crossed zero | Centre rotation keeps the displacement proportional to the angle and continuous through neutral |
-| Eye-ray projection rescaled the whole image, so rotation looked like squash/stretch | Content is translated as screen-space parallax, with no geometric rescaling |
 
 Physical xdpi scaling was already present upstream and is retained. The rodin
 fallback uses its measured physical DPI only if firmware supplies an invalid
@@ -68,12 +66,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 Open **DuoFold**, hold the phone in the desired neutral pose, and tap **Calibrate**.
 Tilt it along either axis or diagonally to open the glass. Settings expose every
 value: manual horizontal and vertical tilt, viewing distance, blur spread,
-darkening, parallax, physical pixel pitch (auto or manual), maximum tilt,
-smoothing, prediction, sensor/manual mode and optional near-neutral drift
-correction, plus live sensor diagnostics and a reset button. Each manual slider
-can be left at zero to isolate a single axis. Set **Parallax** to 0 for frost
-only. The window requests up to 120 Hz; HyperOS retains control over refresh
-rate, power and thermal policy.
+darkening, physical pixel pitch (auto or manual), maximum tilt, smoothing,
+prediction, sensor/manual mode and optional near-neutral drift correction, plus
+live sensor diagnostics and a reset button. Each manual slider can be left at
+zero to isolate a single axis. The window requests up to 120 Hz; HyperOS retains
+control over refresh rate, power and thermal policy.
 
 This is an app-local demo, not a launcher/SystemUI modification. It requires no
 root, privileged sensor permissions or global phone settings changes.

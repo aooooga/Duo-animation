@@ -62,7 +62,6 @@ fun Modifier.foldEffect(
             shader.setFloatUniform("tiltVerticalDegrees", vertical)
             shader.setFloatUniform("eyeDistancePx", parameters.eyeDistanceMillimeters * pxPerMm)
             shader.setFloatUniform("maxTiltDegrees", maxTiltDegrees)
-            shader.setFloatUniform("parallax", parameters.parallax)
             shader.setFloatUniform("blurSpread", parameters.blurSpread)
             shader.setFloatUniform("darkening", parameters.darkening * 6f / pxPerMm)
             renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")

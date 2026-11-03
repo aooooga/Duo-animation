@@ -70,7 +70,6 @@ class RenderTest {
                 shader.setFloatUniform("tiltVerticalDegrees", shot.vertical)
                 shader.setFloatUniform("eyeDistancePx", 450f * 445.61404f / 25.4f)
                 shader.setFloatUniform("maxTiltDegrees", 45f)
-                shader.setFloatUniform("parallax", 0.02f)
                 shader.setFloatUniform("blurSpread", 0.12f)
                 shader.setFloatUniform("darkening", 0.015f * 6f * 25.4f / 445.61404f)
                 scene.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
