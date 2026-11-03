@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import com.example.duofold.FoldAxis
 import com.example.duofold.R
 
 /** Resolve physical pixel pitch, never Android's user-adjustable logical DPI. */
@@ -25,9 +24,8 @@ internal fun pixelsPerMillimeter(xdpi: Float, device: String): Float = when {
 }
 
 fun Modifier.foldEffect(
-    tiltDegrees: Float,
-    hingeSide: Float = if (tiltDegrees >= 0f) 1f else -1f,
-    foldAxis: FoldAxis = FoldAxis.Horizontal,
+    horizontalTiltDegrees: Float,
+    verticalTiltDegrees: Float,
     maxTiltDegrees: Float = 45f,
     parameters: FoldParameters = FoldParameters(),
     onShaderError: (String?) -> Unit = {}
@@ -53,15 +51,16 @@ fun Modifier.foldEffect(
     }
     graphicsLayer {
         clip = true
+        val horizontal = horizontalTiltDegrees.takeIf { it.isFinite() } ?: 0f
+        val vertical = verticalTiltDegrees.takeIf { it.isFinite() } ?: 0f
         if (shader == null || size.width <= 1f || size.height <= 1f ||
-            !tiltDegrees.isFinite() || kotlin.math.abs(tiltDegrees) < 0.001f) {
+            (kotlin.math.abs(horizontal) < 0.001f && kotlin.math.abs(vertical) < 0.001f)) {
             renderEffect = null
         } else {
             shader.setFloatUniform("resolution", size.width, size.height)
-            shader.setFloatUniform("tiltDegrees", tiltDegrees)
+            shader.setFloatUniform("tiltHorizontalDegrees", horizontal)
+            shader.setFloatUniform("tiltVerticalDegrees", vertical)
             shader.setFloatUniform("eyeDistancePx", parameters.eyeDistanceMillimeters * pxPerMm)
-            shader.setFloatUniform("hingeSide", hingeSide)
-            shader.setFloatUniform("foldAxis", foldAxis.shaderValue)
             shader.setFloatUniform("maxTiltDegrees", maxTiltDegrees)
             shader.setFloatUniform("blurSpread", parameters.blurSpread)
             shader.setFloatUniform("darkening", parameters.darkening * 6f / pxPerMm)

@@ -4,9 +4,9 @@ A quality-focused fork of [Atomicx7/Duo-animation](https://github.com/Atomicx7/D
 based on upstream commit `8e5be09463d05018b2716065ec913c8cdd697f11`.
 The goal is accurate, stable motion and correctly scaled glass on the owner's
 POCO X7 Pro, rather than lowering rendering quality for a higher frame rate.
-The fold responds on both axes: left/right rotation hinges on a vertical edge,
-forward/back rotation hinges on a horizontal edge, and every optical and motion
-value is adjustable in Settings.
+The fold responds on both axes at once: left/right rotation and forward/back
+rotation combine into a diagonal corner peel, and every optical and motion value
+is adjustable in Settings.
 
 ## Hardware verified
 
@@ -39,12 +39,16 @@ swap, compass offset or gyro sensitivity multiplier is applied.
 | Out-of-layer shader samples can clamp edge pixels | Explicit opaque-black miss samples match the documented optical model |
 | Fractional blur tap count can put samples outside its intended radius | Full 32-point disk for every visible blur kernel, without a quality reduction |
 | Shader compiled for every tilt update; failures silently show plain content | One shader per layer, new uniform snapshots; visible compilation error |
-| Fold only around a vertical edge (left/right motion) | Vertical and horizontal hinge modes plus Auto, which follows the dominant tilt with hysteresis |
+| Fold only around a vertical edge (left/right motion) | Horizontal and vertical tilt fold simultaneously; a diagonal tilt lifts the opposite corner |
 
 Physical xdpi scaling was already present upstream and is retained. The rodin
 fallback uses its measured physical DPI only if firmware supplies an invalid
-value. Viewing distance is adjustable from 250 to 600 mm because correct
+value. Viewing distance is adjustable from 200 to 2000 mm because correct
 perspective also depends on where the viewer is, not just the phone hardware.
+The wider optical ranges (blur spread up to 1.50, darkening up to 0.30, pixel
+pitch up to 40 px/mm, maximum tilt up to 80°) let the effect be pushed well past
+the upstream defaults; extreme combined tilt intentionally dims toward black as
+the blur radius grows.
 
 ## Build and use
 
@@ -58,13 +62,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Open **DuoFold**, hold the phone in the desired neutral pose, and tap **Calibrate**.
-Turn it left/right or forward/back to open the glass. Settings expose every
-value: fold axis (Auto / horizontal / vertical), manual horizontal and vertical
-tilt, viewing distance, blur spread, darkening, physical pixel pitch (auto or
-manual), maximum tilt, smoothing, prediction, sensor/manual mode and optional
-near-neutral drift correction, plus live sensor diagnostics and a reset button.
-The window requests up to 120 Hz; HyperOS retains control over refresh rate,
-power and thermal policy.
+Tilt it along either axis or diagonally to open the glass. Settings expose every
+value: manual horizontal and vertical tilt, viewing distance, blur spread,
+darkening, physical pixel pitch (auto or manual), maximum tilt, smoothing,
+prediction, sensor/manual mode and optional near-neutral drift correction, plus
+live sensor diagnostics and a reset button. Each manual slider can be left at
+zero to isolate a single axis. The window requests up to 120 Hz; HyperOS retains
+control over refresh rate, power and thermal policy.
 
 This is an app-local demo, not a launcher/SystemUI modification. It requires no
 root, privileged sensor permissions or global phone settings changes.

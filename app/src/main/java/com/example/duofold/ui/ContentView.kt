@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -22,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -35,16 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.duofold.FoldAxis
-import com.example.duofold.FoldAxisMode
 import com.example.duofold.sensors.FoldMotionModel
-import com.example.duofold.sensors.MotionMath
 
 /**
  * Composition root: [DemoContentView] wrapped in [foldEffect], with every
- * optical and motion value exposed in Settings. Tilt works on both axes:
- * left/right rotation folds around a vertical edge, forward/back rotation
- * folds around a horizontal edge, and Auto picks the dominant one.
+ * optical and motion value exposed in Settings. Both axes fold at once:
+ * left/right and forward/back rotation combine into a diagonal corner peel.
  */
 @Composable
 fun ContentView(motionModel: FoldMotionModel) {
@@ -68,7 +62,6 @@ fun ContentView(motionModel: FoldMotionModel) {
     var darkening by rememberSaveable { mutableFloatStateOf(0.015f) }
     var autoPitch by rememberSaveable { mutableStateOf(true) }
     var pitchOverride by rememberSaveable { mutableFloatStateOf(displayPitch) }
-    var axisMode by rememberSaveable { mutableStateOf(FoldAxisMode.Auto) }
     // Default to manual control when no rotation-vector sensor exists.
     var useSensor by remember(hasSensor) { mutableStateOf(hasSensor) }
     var showSettings by remember { mutableStateOf(false) }
@@ -84,21 +77,8 @@ fun ContentView(motionModel: FoldMotionModel) {
 
     val horizontal = if (effectiveUseSensor) sensorHorizontal else manualHorizontal
     val vertical = if (effectiveUseSensor) sensorVertical else manualVertical
-
-    // Hysteresis keeps the hinge from flipping while held near a diagonal.
-    var autoAxis by remember { mutableStateOf<FoldAxis?>(null) }
-    val chosenAxis = MotionMath.chooseAxis(horizontal, vertical, autoAxis)
-    SideEffect { if (chosenAxis != null && chosenAxis != autoAxis) autoAxis = chosenAxis }
-    val axis = when (axisMode) {
-        FoldAxisMode.Horizontal -> FoldAxis.Horizontal
-        FoldAxisMode.Vertical -> FoldAxis.Vertical
-        FoldAxisMode.Auto -> chosenAxis ?: FoldAxis.Horizontal
-    }
-    val tilt = when (axis) {
-        FoldAxis.Horizontal -> horizontal
-        FoldAxis.Vertical -> vertical
-    }
-    val hinge = if (tilt >= 0f) 1f else -1f
+    val hingeHorizontal = if (horizontal >= 0f) "right" else "left"
+    val hingeVertical = if (vertical >= 0f) "bottom" else "top"
 
     val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening) {
         FoldParameters(
@@ -125,9 +105,8 @@ fun ContentView(motionModel: FoldMotionModel) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             DemoContentView(
                 Modifier.foldEffect(
-                    tiltDegrees = tilt,
-                    hingeSide = hinge,
-                    foldAxis = axis,
+                    horizontalTiltDegrees = horizontal,
+                    verticalTiltDegrees = vertical,
                     maxTiltDegrees = maxTilt,
                     parameters = params,
                     onShaderError = { shaderError = it }
@@ -158,31 +137,16 @@ fun ContentView(motionModel: FoldMotionModel) {
                         Text(motionModel.sensorDescription, style = MaterialTheme.typography.labelSmall)
                         Text(diagnostics, style = MaterialTheme.typography.labelSmall)
                         Text(
-                            "Horizontal %.1f°  ·  Vertical %.1f°".format(horizontal, vertical),
+                            "Horizontal %.1f° (hinge %s)  ·  Vertical %.1f° (hinge %s)".format(
+                                horizontal, hingeHorizontal, vertical, hingeVertical
+                            ),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            "Active: %s fold, hinge %s".format(
-                                if (axis == FoldAxis.Horizontal) "left/right" else "top/bottom",
-                                when (axis) {
-                                    FoldAxis.Horizontal -> if (hinge > 0f) "right" else "left"
-                                    FoldAxis.Vertical -> if (hinge > 0f) "bottom" else "top"
-                                }
-                            ),
-                            style = MaterialTheme.typography.labelMedium
+                            "Both axes combine: a diagonal tilt lifts the opposite corner.",
+                            style = MaterialTheme.typography.labelSmall
                         )
-
-                        SectionTitle("Fold axis")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FoldAxisMode.entries.forEach { mode ->
-                                FilterChip(
-                                    selected = axisMode == mode,
-                                    onClick = { axisMode = mode },
-                                    label = { Text(mode.name) }
-                                )
-                            }
-                        }
 
                         SectionTitle("Tilt")
                         TuningSlider(
@@ -206,19 +170,19 @@ fun ContentView(motionModel: FoldMotionModel) {
                         TuningSlider(
                             "Viewing distance",
                             viewingDistance,
-                            250f..600f,
+                            200f..2000f,
                             "%.0f mm".format(viewingDistance)
                         ) { viewingDistance = it }
                         TuningSlider(
                             "Blur spread",
                             blurSpread,
-                            0.02f..0.40f,
+                            0.02f..1.50f,
                             "%.3f".format(blurSpread)
                         ) { blurSpread = it }
                         TuningSlider(
                             "Darkening",
                             darkening,
-                            0f..0.05f,
+                            0f..0.30f,
                             "%.4f".format(darkening)
                         ) { darkening = it }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -233,7 +197,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                             TuningSlider(
                                 "Pixel pitch",
                                 pitchOverride,
-                                1f..30f,
+                                1f..40f,
                                 "%.2f px/mm".format(pitchOverride)
                             ) { pitchOverride = it }
                         }
@@ -242,7 +206,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                         TuningSlider(
                             "Maximum tilt",
                             maxTilt,
-                            5f..60f,
+                            5f..80f,
                             "%.0f°".format(maxTilt)
                         ) { maxTilt = it }
                         TuningSlider(
@@ -303,7 +267,6 @@ fun ContentView(motionModel: FoldMotionModel) {
                                     autoPitch = true
                                     pitchOverride = displayPitch
                                     autoRecenter = false
-                                    axisMode = FoldAxisMode.Auto
                                     manualHorizontal = 0f
                                     manualVertical = 0f
                                 }

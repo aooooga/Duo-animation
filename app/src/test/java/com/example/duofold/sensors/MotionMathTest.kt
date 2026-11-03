@@ -1,9 +1,9 @@
 package com.example.duofold.sensors
 
-import com.example.duofold.FoldAxis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -78,14 +78,27 @@ class MotionMathTest {
         assertEquals(-0.02f, MotionMath.wrap((2 * Math.PI - 0.02).toFloat()), 0.00001f)
     }
 
-    @Test fun dominantAxisUsesHysteresisNearDiagonals() {
-        assertEquals(FoldAxis.Horizontal, MotionMath.chooseAxis(20f, 5f, null))
-        assertEquals(FoldAxis.Vertical, MotionMath.chooseAxis(5f, 20f, null))
-        // Previously vertical: a small horizontal lead must not flip the hinge.
-        assertEquals(FoldAxis.Vertical, MotionMath.chooseAxis(8f, 5f, FoldAxis.Vertical))
-        // A clear lead does switch.
-        assertEquals(FoldAxis.Horizontal, MotionMath.chooseAxis(20f, 5f, FoldAxis.Vertical))
-        // Neutral keeps the previous choice.
-        assertEquals(FoldAxis.Horizontal, MotionMath.chooseAxis(0f, 0f, FoldAxis.Horizontal))
+    @Test fun combinedTiltKeepsBothAxesIndependent() {
+        // Simultaneous yaw+pitch must report both angles; Euler extraction
+        // couples them by a fraction of a degree, so allow 0.05 rad.
+        val out = FloatArray(9)
+        val yawAngle = Math.toRadians(30.0).toFloat()
+        val pitchAngle = Math.toRadians(-20.0).toFloat()
+        val reference = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
+        val current = mul(pitch(pitchAngle), yaw(yawAngle))
+        MotionMath.relative(reference, current, out)
+        assertTrue(abs(MotionMath.tilt(out) - yawAngle) < 0.05f)
+        assertTrue(abs(MotionMath.verticalTilt(out) - pitchAngle) < 0.05f)
+        assertTrue(MotionMath.tilt(out) > 0.1f)
+        assertTrue(MotionMath.verticalTilt(out) < -0.1f)
+    }
+
+    private fun mul(a: FloatArray, b: FloatArray): FloatArray {
+        val out = FloatArray(9)
+        for (r in 0..2) for (c in 0..2) {
+            out[r * 3 + c] = a[r * 3] * b[c] +
+                a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c]
+        }
+        return out
     }
 }

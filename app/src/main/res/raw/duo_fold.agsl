@@ -4,20 +4,18 @@
 // - UI content lives on a fixed plane in world space (the zero-tilt screen plane).
 // - Eye is stationary on that plane's normal through the screen center,
 //   eyeDistancePx back from the plane.
-// - The tilted glass rotates by `tiltDegrees` around a screen-space hinge line.
-//   `foldAxis` selects a vertical hinge line (left/right fold) or a horizontal
-//   hinge line (top/bottom fold). The hinge edge stays in the plane.
+// - The glass tilts around both screen axes at once. The horizontal component
+//   hinges on a left/right edge, the vertical component on a top/bottom edge,
+//   and together they lift the opposite corner (a diagonal peel).
 // - Per pixel: ray from eye through the glass point, continued to the UI plane;
 //   Vogel-disk blur with radius proportional to the glass-to-plane gap, dimmed
 //   in proportion to how much it scatters. A fully-missed kernel is black.
 //
 // Uniform conventions:
-// - tiltDegrees: signed tilt in degrees around the selected hinge line.
-//   Horizontal: positive = right edge farther = hinge on the RIGHT.
-//   Vertical:   positive = bottom edge farther = hinge on the BOTTOM.
-// - hingeSide: +1 = hinge on the positive edge (right/bottom), -1 = left/top.
-//   Resolved at runtime from the tilt sign — never hardcoded.
-// - foldAxis: 0 = left/right fold, 1 = top/bottom fold.
+// - tiltHorizontalDegrees: left/right tilt. Positive = right edge farther =
+//   hinge on the RIGHT; negative = hinge on the LEFT.
+// - tiltVerticalDegrees: forward/back tilt. Positive = bottom edge farther =
+//   hinge on the BOTTOM; negative = hinge on the TOP.
 // - maxTiltDegrees: safety clamp matching the app's tuning slider.
 // - blurSpread: blur radius gained per px of glass/plane separation.
 // - darkening: fraction of light lost per px of blur radius.
@@ -26,10 +24,9 @@
 
 uniform shader content;
 uniform float2 resolution;
-uniform float tiltDegrees;
+uniform float tiltHorizontalDegrees;
+uniform float tiltVerticalDegrees;
 uniform float eyeDistancePx;
-uniform float hingeSide;
-uniform float foldAxis;
 uniform float maxTiltDegrees;
 uniform float blurSpread;
 uniform float darkening;
@@ -54,29 +51,32 @@ half4 main(float2 fragCoord) {
     }
 
     float limit = max(maxTiltDegrees, 1.0);
-    float tilt = radians(clamp(abs(tiltDegrees), 0.0, limit));
-    if (tilt < 1e-5) {
+    float tiltH = radians(clamp(abs(tiltHorizontalDegrees), 0.0, limit));
+    float tiltV = radians(clamp(abs(tiltVerticalDegrees), 0.0, limit));
+    if (tiltH < 1e-5 && tiltV < 1e-5) {
         return content.eval(fragCoord);
     }
 
-    float vertical = step(0.5, foldAxis);
+    // Horizontal component: distance from the left/right hinge edge.
+    float positiveH = step(0.0, tiltHorizontalDegrees);
+    float hingeX = mix(0.0, size.x, positiveH);
+    float sideH = mix(1.0, -1.0, positiveH);
+    float dH = abs(fragCoord.x - hingeX);
 
-    // Fold frame: `across` runs perpendicular to the hinge, `along` parallel.
-    // Both axes are isotropic in physical pixels, so the same optics apply.
-    float across = mix(fragCoord.x, fragCoord.y, vertical);
-    float along = mix(fragCoord.y, fragCoord.x, vertical);
-    float acrossSize = mix(size.x, size.y, vertical);
-    float alongSize = mix(size.y, size.x, vertical);
+    // Vertical component: distance from the top/bottom hinge edge.
+    float positiveV = step(0.0, tiltVerticalDegrees);
+    float hingeY = mix(0.0, size.y, positiveV);
+    float sideV = mix(1.0, -1.0, positiveV);
+    float dV = abs(fragCoord.y - hingeY);
 
-    float isPositive = step(0.0, hingeSide); // 1 = hinge on right/bottom edge
-    float hinge = mix(0.0, acrossSize, isPositive);
-    float side = mix(1.0, -1.0, isPositive); // direction across the screen, away from hinge
-    float d = abs(across - hinge);  // pixel distance from hinge, along the glass
-
-    // Glass rotated `tilt` around the hinge line, rising toward the viewer.
-    float2 glass = float2(hinge + side * d * cos(tilt), along);
-    float gap = d * sin(tilt);
-    float2 eye = float2(acrossSize, alongSize) * 0.5;
+    // Both folds combine: the hinged corner stays in the plane and the
+    // opposite corner lifts by the sum of the two gaps.
+    float2 glass = float2(
+        hingeX + sideH * dH * cos(tiltH),
+        hingeY + sideV * dV * cos(tiltV)
+    );
+    float gap = dH * sin(tiltH) + dV * sin(tiltV);
+    float2 eye = size * 0.5;
 
     // Ray eye -> glass pixel, continued to the UI plane z = 0.
     float depth = eyeDistancePx - gap;
@@ -84,10 +84,7 @@ half4 main(float2 fragCoord) {
         return half4(0.0, 0.0, 0.0, 1.0);
     }
     float t = eyeDistancePx / depth;
-    float2 hit2 = eye + (glass - eye) * t;
-
-    // Map the fold frame back to screen pixels.
-    float2 hit = float2(mix(hit2.x, hit2.y, vertical), mix(hit2.y, hit2.x, vertical));
+    float2 hit = eye + (glass - eye) * t;
 
     float radius = blurSpread * gap;
 

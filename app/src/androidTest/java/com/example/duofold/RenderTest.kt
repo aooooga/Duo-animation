@@ -21,7 +21,7 @@ import java.io.File
 /** Real GPU rendering at native panel resolution, including with display off. */
 @RunWith(AndroidJUnit4::class)
 class RenderTest {
-    private data class Shot(val axis: Float, val angle: Float, val name: String)
+    private data class Shot(val horizontal: Float, val vertical: Float, val name: String)
 
     @Test fun rendersBothAxesOnDeviceGpu() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -47,12 +47,14 @@ class RenderTest {
         renderer.setContentRoot(root)
         val shots = listOf(
             Shot(0f, 0f, "horizontal_0"),
-            Shot(0f, -30f, "horizontal_-30"),
-            Shot(0f, 30f, "horizontal_30"),
-            Shot(0f, 45f, "horizontal_45"),
-            Shot(1f, 30f, "vertical_30"),
-            Shot(1f, -30f, "vertical_-30"),
-            Shot(1f, 45f, "vertical_45")
+            Shot(-30f, 0f, "horizontal_-30"),
+            Shot(30f, 0f, "horizontal_30"),
+            Shot(0f, 30f, "vertical_30"),
+            Shot(0f, -30f, "vertical_-30"),
+            Shot(30f, 20f, "diagonal_30_20"),
+            Shot(-30f, -20f, "diagonal_-30_-20"),
+            Shot(30f, -20f, "diagonal_30_-20"),
+            Shot(45f, 45f, "diagonal_45_45")
         )
         val images = mutableListOf<Bitmap>()
         try {
@@ -61,10 +63,9 @@ class RenderTest {
                     .bufferedReader().use { it.readText() }
                 val shader = RuntimeShader(source)
                 shader.setFloatUniform("resolution", width.toFloat(), height.toFloat())
-                shader.setFloatUniform("tiltDegrees", shot.angle)
+                shader.setFloatUniform("tiltHorizontalDegrees", shot.horizontal)
+                shader.setFloatUniform("tiltVerticalDegrees", shot.vertical)
                 shader.setFloatUniform("eyeDistancePx", 450f * 445.61404f / 25.4f)
-                shader.setFloatUniform("hingeSide", if (shot.angle >= 0f) 1f else -1f)
-                shader.setFloatUniform("foldAxis", shot.axis)
                 shader.setFloatUniform("maxTiltDegrees", 45f)
                 shader.setFloatUniform("blurSpread", 0.12f)
                 shader.setFloatUniform("darkening", 0.015f * 6f * 25.4f / 445.61404f)

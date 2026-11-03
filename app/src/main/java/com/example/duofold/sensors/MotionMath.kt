@@ -1,7 +1,5 @@
 package com.example.duofold.sensors
 
-import com.example.duofold.FoldAxis
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.exp
 
@@ -63,28 +61,4 @@ object MotionMath {
         maxSeconds: Float = 0.025f
     ): Float = (ageSeconds.coerceAtLeast(0f) + 0.5f / refreshHz.coerceIn(30f, 240f))
         .coerceAtMost(maxSeconds.coerceAtLeast(0f))
-
-    /**
-     * Choose the dominant tilt axis. Hysteresis prevents rapid hinge flipping
-     * while the phone is held near a diagonal.
-     */
-    fun chooseAxis(
-        horizontalDegrees: Float,
-        verticalDegrees: Float,
-        previous: FoldAxis?,
-        hysteresisDegrees: Float = 5f
-    ): FoldAxis? {
-        val horizontal = abs(horizontalDegrees)
-        val vertical = abs(verticalDegrees)
-        if (horizontal < 0.001f && vertical < 0.001f) return previous
-        if (previous == null) {
-            return if (horizontal >= vertical) FoldAxis.Horizontal else FoldAxis.Vertical
-        }
-        return when (previous) {
-            FoldAxis.Horizontal ->
-                if (vertical > horizontal + hysteresisDegrees) FoldAxis.Vertical else FoldAxis.Horizontal
-            FoldAxis.Vertical ->
-                if (horizontal > vertical + hysteresisDegrees) FoldAxis.Horizontal else FoldAxis.Vertical
-        }
-    }
 }

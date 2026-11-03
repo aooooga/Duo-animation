@@ -1,4 +1,4 @@
-# POCO X7 Pro validation — 2026-11-02
+# POCO X7 Pro validation — 2026-11-03
 
 This fork targets motion and optical quality. It does not trade lower resolution
 or fewer blur samples for performance, and does not claim a measured frame-rate
@@ -38,21 +38,22 @@ for this device; the corrections concern its downstream motion processing.
 - Prediction follows delivery age / refresh interval and is bounded.
 - Prediction honours a custom cap.
 - Angle wrapping follows the short path across the discontinuity.
-- Dominant-axis selection keeps its choice near a diagonal (hysteresis).
+- Simultaneous yaw and pitch report both axes without one hiding the other.
 
 On-device instrumentation: three tests passed on the connected phone:
 
-- AGSL compiles and accepts every uniform for both fold axes in the phone's Skia runtime.
+- AGSL compiles and accepts every uniform for single-axis and diagonal tilt pairs in the phone's Skia runtime.
 - `game_rotvec` delivered **200.1 Hz** over a three-second trace, with
   **4.17 ms** mean delivery age and **5.00–5.00 ms** timestamp intervals at the
   report's two-decimal precision. This measures delivery, not fusion latency
   relative to physical ground truth.
 - `HardwareRenderer` rendered the shader into native-resolution GPU surfaces
-  at **0°, −30°, +30° and +45°** on the left/right axis and **−30°, +30° and
-  +45°** on the top/bottom axis. Readback checks confirmed visible effects and
-  non-black centre pixels. Both hinge directions on both axes were visually
-  inspected: sharp hinge edge, increasing frost/darkness toward the opposite
-  side, perspective projection and black off-plane boundaries.
+  at **0°, ±30°** on the left/right axis, **±30°** on the top/bottom axis, and
+  the diagonal pairs **30°/20°**, **−30°/−20°**, **30°/−20°** and **45°/45°**.
+  Readback checks confirmed visible effects and non-black centre pixels. The
+  single-axis and diagonal renders were visually inspected: the hinged edges
+  stay crisp, frost increases toward the opposite side and corner, perspective
+  projection follows the eye ray, and off-plane regions are opaque black.
 
 The initial window-based capture could not acquire a surface with the phone's
 screen off. The final test uses a dedicated ImageReader GPU surface and passes
@@ -64,11 +65,11 @@ evidence; they contain only synthetic colour stripes.
 
 The IMU does not measure viewer position. Set viewing distance to approximately
 the distance between the phone and your eyes, hold it in your preferred neutral
-pose, and calibrate. Then turn left/right and forward/back, hold each angle for
-15 seconds, return to neutral, and repeat in landscape. A held tilt should
-remain held with drift correction disabled. Reopening the app establishes a
-fresh reference. Use the Fold axis chips to force a direction if you prefer not
-to rely on the automatic dominant-axis choice.
+pose, and calibrate. Then turn left/right, forward/back and diagonally, hold
+each angle for 15 seconds, return to neutral, and repeat in landscape. A held
+tilt should remain held with drift correction disabled. Reopening the app
+establishes a fresh reference. Set one manual slider to zero to isolate a single
+axis when comparing directions.
 
 Absolute angular accuracy, long-term drift, perceived realism and end-to-end
 motion-to-photon latency require a measured physical reference or user feedback.
