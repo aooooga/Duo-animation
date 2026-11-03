@@ -25,7 +25,8 @@ class RenderTest {
         val horizontal: Float,
         val vertical: Float,
         val name: String,
-        val perspective: Float = 0.6f
+        val perspective: Float = 0.6f,
+        val blurSpread: Float = 0.12f
     )
 
     @Test fun rendersBothAxesOnDeviceGpu() {
@@ -60,6 +61,7 @@ class RenderTest {
             Shot(0f, 30f, "vertical_30"),
             Shot(0f, -30f, "vertical_-30"),
             Shot(0f, 30f, "vertical_30_frost_only", perspective = 0f),
+            Shot(0f, 30f, "vertical_30_no_blur", blurSpread = 0f),
             Shot(3f, 2f, "diagonal_3_2"),
             Shot(30f, 20f, "diagonal_30_20"),
             Shot(30f, 20f, "diagonal_30_20_full", perspective = 1f),
@@ -79,7 +81,7 @@ class RenderTest {
                 shader.setFloatUniform("eyeDistancePx", 450f * 445.61404f / 25.4f)
                 shader.setFloatUniform("maxTiltDegrees", 45f)
                 shader.setFloatUniform("perspective", shot.perspective)
-                shader.setFloatUniform("blurSpread", 0.12f)
+                shader.setFloatUniform("blurSpread", shot.blurSpread)
                 shader.setFloatUniform("darkening", 0.015f * 6f * 25.4f / 445.61404f)
                 scene.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
                 renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw()

@@ -52,11 +52,12 @@ On-device instrumentation: three tests passed on the connected phone:
   larger angles (**±30°** on each axis) and diagonal pairs **30°/20°**,
   **−30°/−20°**, **30°/−20°** and **45°/45°**. Extra cases cover **30°/0°** and
   **30°/20°** at perspective **1.0**, plus **0°/30°** at perspective **0** (frost
-  only). Readback checks confirmed visible effects and non-black centre pixels.
-  The renders were visually inspected: small inputs stay nearly straight,
-  full-strength diagonal tilt shows the expected cross-axis shear and
-  foreshortening, frost-only keeps the blur without moving the content, and
-  off-plane regions are opaque black.
+  only) and **0°/30°** with blur spread **0** (no frost). Readback checks
+  confirmed visible effects and non-black centre pixels. The renders were
+  visually inspected: small inputs stay nearly straight, full-strength diagonal
+  tilt shows the expected cross-axis shear and foreshortening, frost-only keeps
+  the blur without moving the content, blur spread 0 leaves the projection
+  sharp, and off-plane regions are opaque black.
 
 The initial window-based capture could not acquire a surface with the phone's
 screen off. The final test uses a dedicated ImageReader GPU surface and passes

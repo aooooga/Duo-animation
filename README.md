@@ -50,10 +50,10 @@ Physical xdpi scaling was already present upstream and is retained. The rodin
 fallback uses its measured physical DPI only if firmware supplies an invalid
 value. Viewing distance is adjustable from 200 to 2000 mm because correct
 perspective also depends on where the viewer is, not just the phone hardware.
-The wider optical ranges (blur spread up to 1.50, darkening up to 0.30, pixel
+The wider optical ranges (blur spread 0–1.50, darkening up to 0.30, pixel
 pitch up to 40 px/mm, maximum tilt up to 80°) let the effect be pushed well past
-the upstream defaults; extreme combined tilt intentionally dims toward black as
-the blur radius grows.
+the upstream defaults; blur spread 0 disables the frost blur entirely, and
+extreme combined tilt intentionally dims toward black as the blur radius grows.
 
 ## Build and use
 
@@ -75,8 +75,10 @@ near-neutral drift correction, plus live sensor diagnostics and a reset button.
 Each manual slider can be left at zero to isolate a single axis. **Perspective**
 ranges from 0 (frost only, no geometric warp) to 1 (exact inverse perspective);
 the default 0.6 keeps the compensation visible without exaggerating small hand
-movements. The window requests up to 120 Hz; HyperOS retains control over
-refresh rate, power and thermal policy.
+movements. **Blur spread** can be set to 0 to turn the frost blur off completely.
+Settings open as a bottom panel over the live effect, so the background stays
+visible and undimmed. The window requests up to 120 Hz; HyperOS retains control
+over refresh rate, power and thermal policy.
 
 This is an app-local demo, not a launcher/SystemUI modification. It requires no
 root, privileged sensor permissions or global phone settings changes.

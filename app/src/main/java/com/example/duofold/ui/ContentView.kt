@@ -1,21 +1,25 @@
 package com.example.duofold.ui
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -128,13 +132,37 @@ fun ContentView(motionModel: FoldMotionModel) {
         shaderError?.let { Text(it, color = Color.Red, modifier = Modifier.align(Alignment.BottomCenter)) }
 
         if (showSettings) {
-            AlertDialog(
-                onDismissRequest = { showSettings = false },
-                title = { Text("Settings") },
-                text = {
+            BackHandler { showSettings = false }
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.34f),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                shadowElevation = 12.dp
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Settings",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { showSettings = false }) {
+                            Text("Done")
+                        }
+                    }
                     Column(
                         Modifier
                             .fillMaxWidth()
+                            .weight(1f)
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(motionModel.sensorDescription, style = MaterialTheme.typography.labelSmall)
@@ -189,7 +217,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                         TuningSlider(
                             "Blur spread",
                             blurSpread,
-                            0.02f..1.50f,
+                            0f..1.50f,
                             "%.3f".format(blurSpread)
                         ) { blurSpread = it }
                         TuningSlider(
@@ -297,13 +325,8 @@ fun ContentView(motionModel: FoldMotionModel) {
                             }
                         }
                     }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showSettings = false }) {
-                        Text("Done")
-                    }
                 }
-            )
+            }
         }
     }
 }
