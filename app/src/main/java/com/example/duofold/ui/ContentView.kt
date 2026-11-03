@@ -1,6 +1,7 @@
 package com.example.duofold.ui
 
 import android.os.Build
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,8 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -17,49 +22,103 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.duofold.FoldAxis
+import com.example.duofold.FoldAxisMode
 import com.example.duofold.sensors.FoldMotionModel
+import com.example.duofold.sensors.MotionMath
 
 /**
- * Composition root: [DemoContentView] wrapped in [foldEffect], with tilt
- * controls (mode switch, manual slider, recalibration) tucked behind the
- * Settings button instead of a permanent floating panel.
+ * Composition root: [DemoContentView] wrapped in [foldEffect], with every
+ * optical and motion value exposed in Settings. Tilt works on both axes:
+ * left/right rotation folds around a vertical edge, forward/back rotation
+ * folds around a horizontal edge, and Auto picks the dominant one.
  */
 @Composable
 fun ContentView(motionModel: FoldMotionModel) {
-    val sensorTilt by motionModel.tiltDegrees.collectAsState()
+    val sensorHorizontal by motionModel.horizontalDegrees.collectAsState()
+    val sensorVertical by motionModel.verticalDegrees.collectAsState()
     val diagnostics by motionModel.diagnostics.collectAsState()
     val hasSensor by motionModel.hasSensor.collectAsState()
 
-    var manualTilt by rememberSaveable { mutableFloatStateOf(0f) }
+    val context = LocalContext.current
+    val displayPitch = remember(context) {
+        pixelsPerMillimeter(context.resources.displayMetrics.xdpi, Build.DEVICE)
+    }
+
+    var manualHorizontal by rememberSaveable { mutableFloatStateOf(0f) }
+    var manualVertical by rememberSaveable { mutableFloatStateOf(0f) }
     var viewingDistance by rememberSaveable { mutableFloatStateOf(450f) }
+    var maxTilt by rememberSaveable { mutableFloatStateOf(45f) }
+    var smoothingMs by rememberSaveable { mutableFloatStateOf(10f) }
+    var predictionMs by rememberSaveable { mutableFloatStateOf(25f) }
+    var blurSpread by rememberSaveable { mutableFloatStateOf(0.12f) }
+    var darkening by rememberSaveable { mutableFloatStateOf(0.015f) }
+    var autoPitch by rememberSaveable { mutableStateOf(true) }
+    var pitchOverride by rememberSaveable { mutableFloatStateOf(displayPitch) }
+    var axisMode by rememberSaveable { mutableStateOf(FoldAxisMode.Auto) }
     // Default to manual control when no rotation-vector sensor exists.
     var useSensor by remember(hasSensor) { mutableStateOf(hasSensor) }
     var showSettings by remember { mutableStateOf(false) }
     var shaderError by remember { mutableStateOf<String?>(null) }
     var autoRecenter by rememberSaveable { mutableStateOf(false) }
+
     val effectiveUseSensor = useSensor && hasSensor
     LaunchedEffect(effectiveUseSensor) { motionModel.setEnabled(effectiveUseSensor) }
     LaunchedEffect(autoRecenter) { motionModel.setAutoRecenterEnabled(autoRecenter) }
-
-    val tilt = if (effectiveUseSensor) sensorTilt else manualTilt
-    val hinge: Float = if (effectiveUseSensor) {
-        if (sensorTilt >= 0f) 1f else -1f
-    } else {
-        if (manualTilt >= 0f) 1f else -1f
+    LaunchedEffect(maxTilt, smoothingMs, predictionMs) {
+        motionModel.setTuning(maxTilt, smoothingMs, predictionMs)
     }
 
-    val params = remember(viewingDistance) { FoldParameters(eyeDistanceMillimeters = viewingDistance) }
+    val horizontal = if (effectiveUseSensor) sensorHorizontal else manualHorizontal
+    val vertical = if (effectiveUseSensor) sensorVertical else manualVertical
+
+    // Hysteresis keeps the hinge from flipping while held near a diagonal.
+    var autoAxis by remember { mutableStateOf<FoldAxis?>(null) }
+    val chosenAxis = MotionMath.chooseAxis(horizontal, vertical, autoAxis)
+    SideEffect { if (chosenAxis != null && chosenAxis != autoAxis) autoAxis = chosenAxis }
+    val axis = when (axisMode) {
+        FoldAxisMode.Horizontal -> FoldAxis.Horizontal
+        FoldAxisMode.Vertical -> FoldAxis.Vertical
+        FoldAxisMode.Auto -> chosenAxis ?: FoldAxis.Horizontal
+    }
+    val tilt = when (axis) {
+        FoldAxis.Horizontal -> horizontal
+        FoldAxis.Vertical -> vertical
+    }
+    val hinge = if (tilt >= 0f) 1f else -1f
+
+    val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening) {
+        FoldParameters(
+            eyeDistanceMillimeters = viewingDistance,
+            pixelsPerMillimeter = if (autoPitch) 0f else pitchOverride,
+            blurSpread = blurSpread,
+            darkening = darkening
+        )
+    }
+
+    fun nudgeManual(horizontalValue: Float? = null, verticalValue: Float? = null) {
+        if (effectiveUseSensor) {
+            // Drop to manual without a jump: keep both current sensor angles.
+            manualHorizontal = sensorHorizontal
+            manualVertical = sensorVertical
+            useSensor = false
+        }
+        horizontalValue?.let { manualHorizontal = it }
+        verticalValue?.let { manualVertical = it }
+    }
 
     Box(Modifier.fillMaxSize()) {
         // Folded content. On pre-33 (previews only — minSdk is 33) show it plain.
@@ -68,6 +127,8 @@ fun ContentView(motionModel: FoldMotionModel) {
                 Modifier.foldEffect(
                     tiltDegrees = tilt,
                     hingeSide = hinge,
+                    foldAxis = axis,
+                    maxTiltDegrees = maxTilt,
                     parameters = params,
                     onShaderError = { shaderError = it }
                 ),
@@ -89,42 +150,113 @@ fun ContentView(motionModel: FoldMotionModel) {
                 onDismissRequest = { showSettings = false },
                 title = { Text("Settings") },
                 text = {
-                    Column(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
                         Text(motionModel.sensorDescription, style = MaterialTheme.typography.labelSmall)
                         Text(diagnostics, style = MaterialTheme.typography.labelSmall)
-                        Text("Viewing distance: %.0f mm".format(viewingDistance),
-                            style = MaterialTheme.typography.labelMedium)
-                        Slider(value = viewingDistance, onValueChange = { viewingDistance = it },
-                            valueRange = 250f..600f)
                         Text(
-                            "Tilt: %.1f°  ·  hinge %s".format(
-                                tilt,
-                                if (hinge < 0f) "L" else "R"
-                            ),
-                            style = MaterialTheme.typography.labelLarge
+                            "Horizontal %.1f°  ·  Vertical %.1f°".format(horizontal, vertical),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
-                        if (!hasSensor) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "No rotation sensor — manual mode",
-                                color = Color(0xFFFDB022),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Slider(
-                            value = if (effectiveUseSensor) sensorTilt else manualTilt,
-                            onValueChange = {
-                                if (effectiveUseSensor) {
-                                    // Nudge path: dragging in sensor mode drops
-                                    // to manual so the shader stays debuggable.
-                                    useSensor = false
-                                    manualTilt = it
-                                } else {
-                                    manualTilt = it
+                        Text(
+                            "Active: %s fold, hinge %s".format(
+                                if (axis == FoldAxis.Horizontal) "left/right" else "top/bottom",
+                                when (axis) {
+                                    FoldAxis.Horizontal -> if (hinge > 0f) "right" else "left"
+                                    FoldAxis.Vertical -> if (hinge > 0f) "bottom" else "top"
                                 }
-                            },
-                            valueRange = -45f..45f
+                            ),
+                            style = MaterialTheme.typography.labelMedium
                         )
+
+                        SectionTitle("Fold axis")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FoldAxisMode.entries.forEach { mode ->
+                                FilterChip(
+                                    selected = axisMode == mode,
+                                    onClick = { axisMode = mode },
+                                    label = { Text(mode.name) }
+                                )
+                            }
+                        }
+
+                        SectionTitle("Tilt")
+                        TuningSlider(
+                            "Horizontal tilt",
+                            horizontal,
+                            -maxTilt..maxTilt,
+                            "%.1f°".format(horizontal)
+                        ) { nudgeManual(horizontalValue = it) }
+                        TuningSlider(
+                            "Vertical tilt",
+                            vertical,
+                            -maxTilt..maxTilt,
+                            "%.1f°".format(vertical)
+                        ) { nudgeManual(verticalValue = it) }
+                        Text(
+                            "Manual sliders take over from the sensor when dragged.",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+
+                        SectionTitle("Optics")
+                        TuningSlider(
+                            "Viewing distance",
+                            viewingDistance,
+                            250f..600f,
+                            "%.0f mm".format(viewingDistance)
+                        ) { viewingDistance = it }
+                        TuningSlider(
+                            "Blur spread",
+                            blurSpread,
+                            0.02f..0.40f,
+                            "%.3f".format(blurSpread)
+                        ) { blurSpread = it }
+                        TuningSlider(
+                            "Darkening",
+                            darkening,
+                            0f..0.05f,
+                            "%.4f".format(darkening)
+                        ) { darkening = it }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Auto pixel pitch (%.2f px/mm)".format(displayPitch),
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(checked = autoPitch, onCheckedChange = { autoPitch = it })
+                        }
+                        if (!autoPitch) {
+                            TuningSlider(
+                                "Pixel pitch",
+                                pitchOverride,
+                                1f..30f,
+                                "%.2f px/mm".format(pitchOverride)
+                            ) { pitchOverride = it }
+                        }
+
+                        SectionTitle("Motion")
+                        TuningSlider(
+                            "Maximum tilt",
+                            maxTilt,
+                            5f..60f,
+                            "%.0f°".format(maxTilt)
+                        ) { maxTilt = it }
+                        TuningSlider(
+                            "Smoothing",
+                            smoothingMs,
+                            0f..50f,
+                            "%.0f ms".format(smoothingMs)
+                        ) { smoothingMs = it }
+                        TuningSlider(
+                            "Prediction",
+                            predictionMs,
+                            0f..50f,
+                            "%.0f ms".format(predictionMs)
+                        ) { predictionMs = it }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 if (effectiveUseSensor) "Sensor" else "Manual",
@@ -139,27 +271,53 @@ fun ContentView(motionModel: FoldMotionModel) {
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "Auto-calibrate",
+                                "Auto-calibrate near neutral",
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.weight(1f)
                             )
                             Switch(
                                 checked = autoRecenter,
-                                onCheckedChange = {
-                                    autoRecenter = it
-                                    motionModel.setAutoRecenterEnabled(it)
-                                }
+                                onCheckedChange = { autoRecenter = it }
                             )
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                motionModel.recalibrate()
-                                manualTilt = 0f
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Recalibrate")
+
+                        if (!hasSensor) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "No rotation sensor — manual mode",
+                                color = Color(0xFFFDB022),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = {
+                                    viewingDistance = 450f
+                                    maxTilt = 45f
+                                    smoothingMs = 10f
+                                    predictionMs = 25f
+                                    blurSpread = 0.12f
+                                    darkening = 0.015f
+                                    autoPitch = true
+                                    pitchOverride = displayPitch
+                                    autoRecenter = false
+                                    axisMode = FoldAxisMode.Auto
+                                    manualHorizontal = 0f
+                                    manualVertical = 0f
+                                }
+                            ) { Text("Reset tuning") }
+                            Button(
+                                onClick = {
+                                    motionModel.recalibrate()
+                                    manualHorizontal = 0f
+                                    manualVertical = 0f
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Recalibrate")
+                            }
                         }
                     }
                 },
@@ -171,4 +329,25 @@ fun ContentView(motionModel: FoldMotionModel) {
             )
         }
     }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+    )
+}
+
+@Composable
+private fun TuningSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    display: String,
+    onValueChange: (Float) -> Unit
+) {
+    Text("$label: $display", style = MaterialTheme.typography.labelMedium)
+    Slider(value = value, onValueChange = onValueChange, valueRange = valueRange)
 }

@@ -1,5 +1,7 @@
 package com.example.duofold.sensors
 
+import com.example.duofold.FoldAxis
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.exp
 
@@ -13,8 +15,11 @@ object MotionMath {
         return result
     }
 
-    fun smoothing(dtSeconds: Float): Float =
-        1f - exp(-dtSeconds.coerceIn(0f, 0.1f) / 0.010f)
+    /** Exponential smoothing factor for elapsed time; 0 ms means no filtering. */
+    fun smoothing(dtSeconds: Float, timeConstantSeconds: Float = 0.010f): Float {
+        if (timeConstantSeconds <= 0f) return 1f
+        return 1f - exp(-dtSeconds.coerceIn(0f, 0.1f) / timeConstantSeconds)
+    }
 
     /** reference transpose * current, with screen axes in matrix columns. */
     fun relative(reference: FloatArray, current: FloatArray, out: FloatArray) {
@@ -24,7 +29,11 @@ object MotionMath {
         }
     }
 
+    /** Left/right tilt: rotation about the screen Y axis. */
     fun tilt(relative: FloatArray): Float = atan2(relative[2], relative[8])
+
+    /** Forward/back tilt: rotation about the screen X axis. */
+    fun verticalTilt(relative: FloatArray): Float = atan2(-relative[5], relative[8])
 
     /** Derivative of atan2(normal.x, normal.z), including simultaneous pitch/roll. */
     fun tiltRate(relative: FloatArray, screenGyroX: Float, screenGyroY: Float): Float {
@@ -37,7 +46,45 @@ object MotionMath {
         return (z * dx - x * dz) / denominator
     }
 
-    fun predictionSeconds(ageSeconds: Float, refreshHz: Float): Float =
-        (ageSeconds.coerceAtLeast(0f) + 0.5f / refreshHz.coerceIn(30f, 240f))
-            .coerceAtMost(0.025f)
+    /** Derivative of atan2(-normal.y, normal.z), including simultaneous yaw/roll. */
+    fun verticalTiltRate(relative: FloatArray, screenGyroX: Float, screenGyroY: Float): Float {
+        val y = relative[5]
+        val z = relative[8]
+        val denominator = y * y + z * z
+        if (denominator < 0.01f) return 0f
+        val dy = relative[3] * screenGyroY - relative[4] * screenGyroX
+        val dz = relative[6] * screenGyroY - relative[7] * screenGyroX
+        return (y * dz - z * dy) / denominator
+    }
+
+    fun predictionSeconds(
+        ageSeconds: Float,
+        refreshHz: Float,
+        maxSeconds: Float = 0.025f
+    ): Float = (ageSeconds.coerceAtLeast(0f) + 0.5f / refreshHz.coerceIn(30f, 240f))
+        .coerceAtMost(maxSeconds.coerceAtLeast(0f))
+
+    /**
+     * Choose the dominant tilt axis. Hysteresis prevents rapid hinge flipping
+     * while the phone is held near a diagonal.
+     */
+    fun chooseAxis(
+        horizontalDegrees: Float,
+        verticalDegrees: Float,
+        previous: FoldAxis?,
+        hysteresisDegrees: Float = 5f
+    ): FoldAxis? {
+        val horizontal = abs(horizontalDegrees)
+        val vertical = abs(verticalDegrees)
+        if (horizontal < 0.001f && vertical < 0.001f) return previous
+        if (previous == null) {
+            return if (horizontal >= vertical) FoldAxis.Horizontal else FoldAxis.Vertical
+        }
+        return when (previous) {
+            FoldAxis.Horizontal ->
+                if (vertical > horizontal + hysteresisDegrees) FoldAxis.Vertical else FoldAxis.Horizontal
+            FoldAxis.Vertical ->
+                if (horizontal > vertical + hysteresisDegrees) FoldAxis.Horizontal else FoldAxis.Vertical
+        }
+    }
 }

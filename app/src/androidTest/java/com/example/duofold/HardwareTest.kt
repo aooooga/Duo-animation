@@ -24,14 +24,18 @@ class HardwareTest {
     @Test fun shaderCompilesWithDeviceSkiaAndAllUniforms() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val source = context.resources.openRawResource(R.raw.duo_fold).bufferedReader().use { it.readText() }
-        val shader = RuntimeShader(source)
-        shader.setFloatUniform("resolution", 1220f, 2712f)
-        shader.setFloatUniform("tiltDegrees", 30f)
-        shader.setFloatUniform("eyeDistancePx", 7895f)
-        shader.setFloatUniform("hingeSide", 1f)
-        shader.setFloatUniform("blurSpread", 0.12f)
-        shader.setFloatUniform("darkening", 0.00513f)
-        assertNotNull(RenderEffect.createRuntimeShaderEffect(shader, "content"))
+        for (axis in listOf(0f, 1f)) {
+            val shader = RuntimeShader(source)
+            shader.setFloatUniform("resolution", 1220f, 2712f)
+            shader.setFloatUniform("tiltDegrees", 30f)
+            shader.setFloatUniform("eyeDistancePx", 7895f)
+            shader.setFloatUniform("hingeSide", 1f)
+            shader.setFloatUniform("foldAxis", axis)
+            shader.setFloatUniform("maxTiltDegrees", 45f)
+            shader.setFloatUniform("blurSpread", 0.12f)
+            shader.setFloatUniform("darkening", 0.00513f)
+            assertNotNull(RenderEffect.createRuntimeShaderEffect(shader, "content"))
+        }
     }
 
     @Test fun measureActualFusionDelivery() {

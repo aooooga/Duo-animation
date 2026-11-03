@@ -31,8 +31,13 @@ class FoldMotionModel(
     private var lastTimestamp = 0L
     private var lastRotation = -1
     private var needsReference = true
-    private var filtered = 0f
-    private var baseline = 0f
+    private var filteredHorizontal = 0f
+    private var filteredVertical = 0f
+    private var baselineHorizontal = 0f
+    private var baselineVertical = 0f
+    private var maxTiltRad = Math.toRadians(45.0).toFloat()
+    private var smoothingSeconds = 0.010f
+    private var predictionSeconds = 0.025f
     private var recenter = false
     private var started = false
     private var enabled = true
@@ -40,8 +45,10 @@ class FoldMotionModel(
     private var count = 0
     private var reportTimestamp = 0L
 
-    private val _tiltDegrees = MutableStateFlow(0f)
-    val tiltDegrees = _tiltDegrees.asStateFlow()
+    private val _horizontalDegrees = MutableStateFlow(0f)
+    val horizontalDegrees = _horizontalDegrees.asStateFlow()
+    private val _verticalDegrees = MutableStateFlow(0f)
+    val verticalDegrees = _verticalDegrees.asStateFlow()
     private val _hasSensor = MutableStateFlow(rotationSensor != null)
     val hasSensor = _hasSensor.asStateFlow()
     private val _diagnostics = MutableStateFlow("Waiting for sensor samples")
@@ -53,6 +60,13 @@ class FoldMotionModel(
 
     fun setResumed(value: Boolean) { resumed = value; updateRegistration() }
     fun setEnabled(value: Boolean) { enabled = value; updateRegistration() }
+
+    /** Live tuning from Settings; all values are clamped to safe ranges. */
+    fun setTuning(maxTiltDegrees: Float, smoothingMs: Float, predictionMs: Float) {
+        maxTiltRad = Math.toRadians(maxTiltDegrees.coerceIn(1f, 89f).toDouble()).toFloat()
+        smoothingSeconds = (smoothingMs / 1000f).coerceIn(0f, 0.2f)
+        predictionSeconds = (predictionMs / 1000f).coerceIn(0f, 0.1f)
+    }
 
     private fun updateRegistration() {
         val wanted = resumed && enabled
@@ -81,9 +95,12 @@ class FoldMotionModel(
         lastTimestamp = 0L
         reportTimestamp = 0L
         count = 0
-        baseline = 0f
-        filtered = 0f
-        _tiltDegrees.value = 0f
+        baselineHorizontal = 0f
+        baselineVertical = 0f
+        filteredHorizontal = 0f
+        filteredVertical = 0f
+        _horizontalDegrees.value = 0f
+        _verticalDegrees.value = 0f
     }
 
     fun setAutoRecenterEnabled(value: Boolean) {
@@ -116,18 +133,26 @@ class FoldMotionModel(
             screen.copyInto(reference)
             needsReference = false
             lastRotation = rotation
-            baseline = 0f
-            filtered = 0f
-            _tiltDegrees.value = 0f
+            baselineHorizontal = 0f
+            baselineVertical = 0f
+            filteredHorizontal = 0f
+            filteredVertical = 0f
+            _horizontalDegrees.value = 0f
+            _verticalDegrees.value = 0f
             return
         }
         MotionMath.relative(reference, screen, relative)
-        // At edge-on pitch, heading is undefined: retain the last valid angle.
-        if (relative[2] * relative[2] + relative[8] * relative[8] < 0.01f) return
-        val measured = MotionMath.tilt(relative)
+
+        // Each axis is undefined when the screen normal lies along it. Keep the
+        // last valid angle for that axis instead of emitting a 90-degree spike.
+        val horizontalValid = relative[2] * relative[2] + relative[8] * relative[8] >= 0.01f
+        val verticalValid = relative[5] * relative[5] + relative[8] * relative[8] >= 0.01f
+        val measuredHorizontal = MotionMath.tilt(relative)
+        val measuredVertical = MotionMath.verticalTilt(relative)
         val gyroFresh = gyroTimestamp != 0L &&
             abs(event.timestamp - gyroTimestamp) <= 30_000_000L
-        var predicted = measured
+        var predictedHorizontal = measuredHorizontal
+        var predictedVertical = measuredVertical
         if (gyroFresh) {
             val gx = when (rotation) {
                 Surface.ROTATION_90 -> gyro[1]
@@ -142,17 +167,33 @@ class FoldMotionModel(
                 else -> gyro[1]
             }
             val age = (SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1e9f
-            predicted += MotionMath.tiltRate(relative, gx, gy) *
-                MotionMath.predictionSeconds(age, refreshRate())
+            val horizon = MotionMath.predictionSeconds(age, refreshRate(), predictionSeconds)
+            predictedHorizontal += MotionMath.tiltRate(relative, gx, gy) * horizon
+            predictedVertical += MotionMath.verticalTiltRate(relative, gx, gy) * horizon
         }
         // Optional drift correction only near neutral, never erase a held tilt.
-        if (recenter && gyroFresh && gyro.all { abs(it) < 0.025f } &&
-            abs(MotionMath.wrap(measured - baseline)) < Math.toRadians(2.0)) {
-            baseline += MotionMath.wrap(measured - baseline) * (dt / 30f).coerceIn(0f, 1f)
+        if (recenter && gyroFresh && horizontalValid && verticalValid &&
+            gyro.all { abs(it) < 0.025f } &&
+            abs(MotionMath.wrap(measuredHorizontal - baselineHorizontal)) < Math.toRadians(2.0) &&
+            abs(MotionMath.wrap(measuredVertical - baselineVertical)) < Math.toRadians(2.0)) {
+            val factor = (dt / 30f).coerceIn(0f, 1f)
+            baselineHorizontal += MotionMath.wrap(measuredHorizontal - baselineHorizontal) * factor
+            baselineVertical += MotionMath.wrap(measuredVertical - baselineVertical) * factor
         }
-        val target = MotionMath.wrap(predicted - baseline).coerceIn(-LIMIT_RAD, LIMIT_RAD)
-        filtered += MotionMath.wrap(target - filtered) * MotionMath.smoothing(dt)
-        _tiltDegrees.value = Math.toDegrees(filtered.toDouble()).toFloat()
+        if (horizontalValid) {
+            val target = MotionMath.wrap(predictedHorizontal - baselineHorizontal)
+                .coerceIn(-maxTiltRad, maxTiltRad)
+            filteredHorizontal += MotionMath.wrap(target - filteredHorizontal) *
+                MotionMath.smoothing(dt, smoothingSeconds)
+            _horizontalDegrees.value = Math.toDegrees(filteredHorizontal.toDouble()).toFloat()
+        }
+        if (verticalValid) {
+            val target = MotionMath.wrap(predictedVertical - baselineVertical)
+                .coerceIn(-maxTiltRad, maxTiltRad)
+            filteredVertical += MotionMath.wrap(target - filteredVertical) *
+                MotionMath.smoothing(dt, smoothingSeconds)
+            _verticalDegrees.value = Math.toDegrees(filteredVertical.toDouble()).toFloat()
+        }
         count++
         if (reportTimestamp == 0L) reportTimestamp = event.timestamp
         val interval = (event.timestamp - reportTimestamp) / 1e9f
@@ -166,9 +207,4 @@ class FoldMotionModel(
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
-    companion object {
-        const val MAX_TILT = 45f
-        private val LIMIT_RAD = Math.toRadians(MAX_TILT.toDouble()).toFloat()
-    }
 }

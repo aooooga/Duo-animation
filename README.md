@@ -4,6 +4,9 @@ A quality-focused fork of [Atomicx7/Duo-animation](https://github.com/Atomicx7/D
 based on upstream commit `8e5be09463d05018b2716065ec913c8cdd697f11`.
 The goal is accurate, stable motion and correctly scaled glass on the owner's
 POCO X7 Pro, rather than lowering rendering quality for a higher frame rate.
+The fold responds on both axes: left/right rotation hinges on a vertical edge,
+forward/back rotation hinges on a horizontal edge, and every optical and motion
+value is adjustable in Settings.
 
 ## Hardware verified
 
@@ -36,6 +39,7 @@ swap, compass offset or gyro sensitivity multiplier is applied.
 | Out-of-layer shader samples can clamp edge pixels | Explicit opaque-black miss samples match the documented optical model |
 | Fractional blur tap count can put samples outside its intended radius | Full 32-point disk for every visible blur kernel, without a quality reduction |
 | Shader compiled for every tilt update; failures silently show plain content | One shader per layer, new uniform snapshots; visible compilation error |
+| Fold only around a vertical edge (left/right motion) | Vertical and horizontal hinge modes plus Auto, which follows the dominant tilt with hysteresis |
 
 Physical xdpi scaling was already present upstream and is retained. The rodin
 fallback uses its measured physical DPI only if firmware supplies an invalid
@@ -54,10 +58,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Open **DuoFold**, hold the phone in the desired neutral pose, and tap **Calibrate**.
-Turn it left/right around its vertical axis to open the glass. Settings expose
-manual tilt, viewing distance, optional near-neutral drift correction and actual
-sensor delivery diagnostics. The window requests up to 120 Hz; HyperOS retains
-control over refresh rate, power and thermal policy.
+Turn it left/right or forward/back to open the glass. Settings expose every
+value: fold axis (Auto / horizontal / vertical), manual horizontal and vertical
+tilt, viewing distance, blur spread, darkening, physical pixel pitch (auto or
+manual), maximum tilt, smoothing, prediction, sensor/manual mode and optional
+near-neutral drift correction, plus live sensor diagnostics and a reset button.
+The window requests up to 120 Hz; HyperOS retains control over refresh rate,
+power and thermal policy.
 
 This is an app-local demo, not a launcher/SystemUI modification. It requires no
 root, privileged sensor permissions or global phone settings changes.

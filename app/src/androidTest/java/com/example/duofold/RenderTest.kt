@@ -21,7 +21,9 @@ import java.io.File
 /** Real GPU rendering at native panel resolution, including with display off. */
 @RunWith(AndroidJUnit4::class)
 class RenderTest {
-    @Test fun rendersBothHingesOnDeviceGpu() {
+    private data class Shot(val axis: Float, val angle: Float, val name: String)
+
+    @Test fun rendersBothAxesOnDeviceGpu() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val width = 1220
         val height = 2712
@@ -43,15 +45,27 @@ class RenderTest {
         root.endRecording()
         renderer.setSurface(reader.surface)
         renderer.setContentRoot(root)
+        val shots = listOf(
+            Shot(0f, 0f, "horizontal_0"),
+            Shot(0f, -30f, "horizontal_-30"),
+            Shot(0f, 30f, "horizontal_30"),
+            Shot(0f, 45f, "horizontal_45"),
+            Shot(1f, 30f, "vertical_30"),
+            Shot(1f, -30f, "vertical_-30"),
+            Shot(1f, 45f, "vertical_45")
+        )
         val images = mutableListOf<Bitmap>()
         try {
-            for (angle in listOf(0f, -30f, 30f, 45f)) {
-                val source = context.resources.openRawResource(R.raw.duo_fold).bufferedReader().use { it.readText() }
+            for (shot in shots) {
+                val source = context.resources.openRawResource(R.raw.duo_fold)
+                    .bufferedReader().use { it.readText() }
                 val shader = RuntimeShader(source)
                 shader.setFloatUniform("resolution", width.toFloat(), height.toFloat())
-                shader.setFloatUniform("tiltDegrees", angle)
+                shader.setFloatUniform("tiltDegrees", shot.angle)
                 shader.setFloatUniform("eyeDistancePx", 450f * 445.61404f / 25.4f)
-                shader.setFloatUniform("hingeSide", if (angle >= 0f) 1f else -1f)
+                shader.setFloatUniform("hingeSide", if (shot.angle >= 0f) 1f else -1f)
+                shader.setFloatUniform("foldAxis", shot.axis)
+                shader.setFloatUniform("maxTiltDegrees", 45f)
                 shader.setFloatUniform("blurSpread", 0.12f)
                 shader.setFloatUniform("darkening", 0.015f * 6f * 25.4f / 445.61404f)
                 scene.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
@@ -59,14 +73,16 @@ class RenderTest {
                 val image = checkNotNull(reader.acquireNextImage()) { "GPU produced no image" }
                 val bitmap = image.use {
                     checkNotNull(it.hardwareBuffer).use { buffer ->
-                        val hardware = checkNotNull(Bitmap.wrapHardwareBuffer(buffer, ColorSpace.get(ColorSpace.Named.SRGB)))
+                        val hardware = checkNotNull(
+                            Bitmap.wrapHardwareBuffer(buffer, ColorSpace.get(ColorSpace.Named.SRGB))
+                        )
                         val copy = checkNotNull(hardware.copy(Bitmap.Config.ARGB_8888, false))
                         hardware.recycle()
                         copy
                     }
                 }
                 val directory = File(context.getExternalFilesDir(null), "validation").apply { mkdirs() }
-                File(directory, "tilt_${angle.toInt()}.png").outputStream().use {
+                File(directory, "tilt_${shot.name}.png").outputStream().use {
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                 }
                 images.add(bitmap)
@@ -74,10 +90,12 @@ class RenderTest {
             val original = images.first()
             for (image in images.drop(1)) {
                 var changed = 0
-                for (x in 100 until width - 100 step 20) {
-                    if (image.getPixel(x, height / 2) != original.getPixel(x, height / 2)) changed++
+                for (x in 100 until width - 100 step 40) {
+                    for (y in 100 until height - 100 step 40) {
+                        if (image.getPixel(x, y) != original.getPixel(x, y)) changed++
+                    }
                 }
-                assertTrue("Effect did not render", changed > 10)
+                assertTrue("Effect did not render", changed > 20)
                 assertTrue("Effect rendered a black screen",
                     (image.getPixel(width / 2, height / 2) and 0xffffff) != 0)
             }
