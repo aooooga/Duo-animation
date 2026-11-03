@@ -60,6 +60,7 @@ fun ContentView(motionModel: FoldMotionModel) {
     var predictionMs by rememberSaveable { mutableFloatStateOf(25f) }
     var blurSpread by rememberSaveable { mutableFloatStateOf(0.12f) }
     var darkening by rememberSaveable { mutableFloatStateOf(0.015f) }
+    var parallax by rememberSaveable { mutableFloatStateOf(0.02f) }
     var autoPitch by rememberSaveable { mutableStateOf(true) }
     var pitchOverride by rememberSaveable { mutableFloatStateOf(displayPitch) }
     // Default to manual control when no rotation-vector sensor exists.
@@ -80,12 +81,13 @@ fun ContentView(motionModel: FoldMotionModel) {
     val awayHorizontal = if (horizontal >= 0f) "right" else "left"
     val awayVertical = if (vertical >= 0f) "bottom" else "top"
 
-    val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening) {
+    val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening, parallax) {
         FoldParameters(
             eyeDistanceMillimeters = viewingDistance,
             pixelsPerMillimeter = if (autoPitch) 0f else pitchOverride,
             blurSpread = blurSpread,
-            darkening = darkening
+            darkening = darkening,
+            parallax = parallax
         )
     }
 
@@ -144,7 +146,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            "The glass rotates about its centre; both axes combine and the near/far halves shift in opposite directions.",
+                            "Rotation slides the content without scaling it; the frost remains symmetric about the centre.",
                             style = MaterialTheme.typography.labelSmall
                         )
 
@@ -185,6 +187,12 @@ fun ContentView(motionModel: FoldMotionModel) {
                             0f..0.30f,
                             "%.4f".format(darkening)
                         ) { darkening = it }
+                        TuningSlider(
+                            "Parallax",
+                            parallax,
+                            0f..0.06f,
+                            "%.3f".format(parallax)
+                        ) { parallax = it }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "Auto pixel pitch (%.2f px/mm)".format(displayPitch),
@@ -264,6 +272,7 @@ fun ContentView(motionModel: FoldMotionModel) {
                                     predictionMs = 25f
                                     blurSpread = 0.12f
                                     darkening = 0.015f
+                                    parallax = 0.02f
                                     autoPitch = true
                                     pitchOverride = displayPitch
                                     autoRecenter = false

@@ -52,9 +52,9 @@ On-device instrumentation: three tests passed on the connected phone:
   larger angles (**±30°** on each axis) and diagonal pairs **30°/20°**,
   **−30°/−20°**, **30°/−20°** and **45°/45°**. Readback checks confirmed
   visible effects and non-black centre pixels. The renders were visually
-  inspected: the centre line stays sharp, the near and far halves blur and
-  shift in opposite directions, small inputs produce a proportionally small
-  parallax, and off-plane regions are opaque black.
+  inspected: the image translates without bending, straight stripe and bar
+  boundaries stay straight, the near and far halves frost symmetrically, small
+  inputs produce a proportionally small slide, and off-frame regions are black.
 
 The initial window-based capture could not acquire a surface with the phone's
 screen off. The final test uses a dedicated ImageReader GPU surface and passes
@@ -70,9 +70,9 @@ pose, and calibrate. Then turn left/right, forward/back and diagonally, hold
 each angle for 15 seconds, return to neutral, and repeat in landscape. A held
 tilt should remain held with drift correction disabled. Reopening the app
 establishes a fresh reference. Set one manual slider to zero to isolate a single
-axis when comparing directions. Because the glass rotates about the screen
-centre, a few degrees should produce only a slight symmetric shift; if it does
-not, check that the viewing distance roughly matches the real eye distance.
+axis when comparing directions. **Parallax** controls how far the content slides;
+set it to 0 to keep only the frost optics, or raise it for a more pronounced
+sense of a fixed scene behind the glass.
 
 Absolute angular accuracy, long-term drift, perceived realism and end-to-end
 motion-to-photon latency require a measured physical reference or user feedback.

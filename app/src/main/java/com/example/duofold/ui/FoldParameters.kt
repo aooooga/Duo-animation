@@ -5,9 +5,9 @@ package com.example.duofold.ui
  *
  * @param eyeDistanceMillimeters Distance from the viewer's eyes to the untilted
  *   screen, looking at it head-on. The eye stays there while the device tilts.
- *   Default 450mm (the original uses 320): a larger distance flattens the
- *   perspective magnification — less sideways stretch and less edge cropping
- *   at big tilts — while the gap-driven blur/darken is completely unaffected.
+ *   Default 450mm (the original uses 320). A farther eye makes the screen
+ *   subtend a smaller angle, so the same rotation produces a larger
+ *   screen-space parallax slide; the gap-driven blur/darken is unaffected.
  * @param pixelsPerMillimeter Density of layer pixels (≈ xdpi / 25.4). If <= 0,
  *   [foldEffect] auto-resolves it from display metrics. The original uses
  *   ~6 pt/mm for iPhone panels.
@@ -17,10 +17,15 @@ package com.example.duofold.ui
  *   the glass, the darker it gets. Authored at the 6 units/mm reference
  *   density of the original; [foldEffect] normalizes it by the real display
  *   density so the look matches iOS on any screen.
+ * @param parallax Screen-space slide applied to the content per unit of
+ *   (eyeDistancePx * sin(tilt)). The content is translated, not rescaled, so
+ *   phone rotation reads as parallax rather than squash/stretch. 0 disables
+ *   the geometric response and leaves only the frost optics.
  */
 data class FoldParameters(
     val eyeDistanceMillimeters: Float = 450f,
     val pixelsPerMillimeter: Float = 0f, // 0 = auto-resolve from display metrics
     val blurSpread: Float = 0.12f,
-    val darkening: Float = 0.015f
+    val darkening: Float = 0.015f,
+    val parallax: Float = 0.02f
 )

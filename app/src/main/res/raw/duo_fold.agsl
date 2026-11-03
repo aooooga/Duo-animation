@@ -5,18 +5,20 @@
 // - Eye is stationary on that plane's normal through the screen center,
 //   eyeDistancePx back from the plane.
 // - The glass rotates about the screen centre on both axes at once, as a rigid
-//   pane does when the phone is turned in the hand. The centre line stays in
-//   the content plane; one side tilts toward the eye and the other away. This
-//   keeps small rotations small and avoids the whole-screen hinge flip the old
-//   edge-hinged model produced when the tilt sign crossed zero.
-// - Per pixel: ray from eye through the glass point, continued to the UI plane;
-//   Vogel-disk blur with radius proportional to the glass-plane gap, dimmed
-//   in proportion to how much it scatters. A fully-missed kernel is black.
+//   pane does when the phone is turned in the hand. The signed glass/content
+//   separation drives the frost optics; it is zero on the centre line and
+//   grows toward the near and far edges.
+// - The captured content is treated as fixed in the world and slides across
+//   the screen as the phone rotates (parallax). It is translated, never
+//   rescaled, so rotation does not squash or stretch the image.
+// - Per pixel: Vogel-disk blur with radius proportional to |separation|,
+//   dimmed in proportion to how much it scatters. A fully-missed kernel is black.
 //
 // Uniform conventions:
 // - tiltHorizontalDegrees: left/right tilt. Positive = right side farther.
 // - tiltVerticalDegrees: forward/back tilt. Positive = bottom side farther.
 // - maxTiltDegrees: safety clamp matching the app's tuning slider.
+// - parallax: screen-space slide per unit of eyeDistancePx * sin(tilt).
 // - blurSpread: blur radius gained per px of glass/plane separation.
 // - darkening: fraction of light lost per px of blur radius.
 //
@@ -28,6 +30,7 @@ uniform float tiltHorizontalDegrees;
 uniform float tiltVerticalDegrees;
 uniform float eyeDistancePx;
 uniform float maxTiltDegrees;
+uniform float parallax;
 uniform float blurSpread;
 uniform float darkening;
 
@@ -57,26 +60,17 @@ half4 main(float2 fragCoord) {
         return content.eval(fragCoord);
     }
 
-    // Rotate the glass about the screen centre. `p` is the signed offset of
-    // this pixel from the centre; the centre line stays in the content plane.
+    // Signed glass/content separation: zero on the centre line, positive on
+    // the near half and negative on the far half.
     float2 center = size * 0.5;
     float2 p = fragCoord - center;
-    float2 glass = float2(
-        center.x + p.x * cos(tiltH),
-        center.y + p.y * cos(tiltV)
-    );
-    // Positive horizontal tilt puts the right side farther from the eye;
-    // positive vertical tilt puts the bottom side farther. The gap is signed:
-    // the near half sits in front of the content plane, the far half behind.
     float gap = -p.x * sin(tiltH) - p.y * sin(tiltV);
 
-    // Ray eye -> glass pixel, continued to the UI plane z = 0.
-    float depth = eyeDistancePx - gap;
-    if (depth <= 1e-3) {
-        return half4(0.0, 0.0, 0.0, 1.0);
-    }
-    float t = eyeDistancePx / depth;
-    float2 hit = center + (glass - center) * t;
+    // Content is fixed in the world: rotation slides it across the screen
+    // instead of rescaling it. A farther eye makes the screen subtend a
+    // smaller angle, so the same rotation slides more pixels.
+    float2 shift = eyeDistancePx * sin(float2(tiltH, tiltV)) * parallax;
+    float2 hit = fragCoord - shift;
 
     float radius = blurSpread * abs(gap);
 
