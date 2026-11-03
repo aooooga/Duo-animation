@@ -19,9 +19,7 @@
 // - blurSpread: blur radius gained per px of glass/plane separation.
 // - darkening: fraction of light lost per px of blur radius.
 //
-// NOTE: keep this shader to minimal AGSL constructs (no break/continue, no
-// bool locals, no helper functions) — anything fancier has failed to compile
-// on-device and silently disables the effect via the Kotlin fallback.
+// Compilation is covered by an on-device test, including the sample bounds helper.
 
 uniform shader content;
 uniform float2 resolution;
@@ -33,6 +31,16 @@ uniform float darkening;
 
 const float GOLDEN_ANGLE = 2.39996322972865332; // radians, Vogel disk spacing
 const float TWO_PI = 6.28318530717958648;
+
+// RenderEffect child shaders can clamp outside the captured layer. A missed
+// sample must be opaque black, not a stretched row of edge text or icons.
+half4 samplePlane(float2 point) {
+    if (point.x < 0.0 || point.y < 0.0 ||
+        point.x >= resolution.x || point.y >= resolution.y) {
+        return half4(0.0, 0.0, 0.0, 1.0);
+    }
+    return content.eval(point);
+}
 
 half4 main(float2 fragCoord) {
     float2 size = resolution;
@@ -76,23 +84,23 @@ half4 main(float2 fragCoord) {
     float atten = max(1.0 - darkening * radius, 0.0);
 
     if (radius < 0.5) {
-        return content.eval(hit) * half(atten);
+        half4 sample = samplePlane(hit);
+        return half4(sample.rgb * half(atten), sample.a);
     }
 
     // Vogel disk with per-pixel rotation (banding becomes frosted-glass grain).
-    // Small kernels need few taps; fixed 32-iteration loop with a weight mask
-    // (no break) keeps frames cheap near the hinge and compiles everywhere.
-    float tapsF = clamp(radius * 2.0, 6.0, 32.0);
+    // Keep all 32 samples for small kernels too: no fractional sample-count
+    // discontinuities or out-of-radius taps as the phone moves through neutral.
+    float tapsF = 32.0;
     float rotation = fract(sin(dot(fragCoord, float2(12.9898, 78.233))) * 43758.5453) * TWO_PI;
     half3 sum = half3(0.0);
     float wsum = 0.0;
     for (int i = 0; i < 32; i++) {
         float fi = float(i);
-        float w = 1.0 - step(tapsF, fi);
         float r = radius * sqrt((fi + 0.5) / tapsF);
         float a = fi * GOLDEN_ANGLE + rotation;
-        sum += content.eval(hit + r * float2(cos(a), sin(a))).rgb * half(w);
-        wsum += w;
+        sum += samplePlane(hit + r * float2(cos(a), sin(a))).rgb;
+        wsum += 1.0;
     }
     half3 avg = sum / half(max(wsum, 1.0));
     return half4(avg * half(atten), 1.0);
