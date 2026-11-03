@@ -47,10 +47,13 @@ class RenderTest {
         renderer.setContentRoot(root)
         val shots = listOf(
             Shot(0f, 0f, "horizontal_0"),
+            Shot(5f, 0f, "horizontal_5"),
             Shot(-30f, 0f, "horizontal_-30"),
             Shot(30f, 0f, "horizontal_30"),
+            Shot(0f, 5f, "vertical_5"),
             Shot(0f, 30f, "vertical_30"),
             Shot(0f, -30f, "vertical_-30"),
+            Shot(3f, 2f, "diagonal_3_2"),
             Shot(30f, 20f, "diagonal_30_20"),
             Shot(-30f, -20f, "diagonal_-30_-20"),
             Shot(30f, -20f, "diagonal_30_-20"),

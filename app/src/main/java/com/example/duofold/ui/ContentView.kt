@@ -37,8 +37,8 @@ import com.example.duofold.sensors.FoldMotionModel
 
 /**
  * Composition root: [DemoContentView] wrapped in [foldEffect], with every
- * optical and motion value exposed in Settings. Both axes fold at once:
- * left/right and forward/back rotation combine into a diagonal corner peel.
+ * optical and motion value exposed in Settings. Both axes fold at once about
+ * the screen centre, matching a rigid phone rotated in the hand.
  */
 @Composable
 fun ContentView(motionModel: FoldMotionModel) {
@@ -77,8 +77,8 @@ fun ContentView(motionModel: FoldMotionModel) {
 
     val horizontal = if (effectiveUseSensor) sensorHorizontal else manualHorizontal
     val vertical = if (effectiveUseSensor) sensorVertical else manualVertical
-    val hingeHorizontal = if (horizontal >= 0f) "right" else "left"
-    val hingeVertical = if (vertical >= 0f) "bottom" else "top"
+    val awayHorizontal = if (horizontal >= 0f) "right" else "left"
+    val awayVertical = if (vertical >= 0f) "bottom" else "top"
 
     val params = remember(viewingDistance, autoPitch, pitchOverride, blurSpread, darkening) {
         FoldParameters(
@@ -137,14 +137,14 @@ fun ContentView(motionModel: FoldMotionModel) {
                         Text(motionModel.sensorDescription, style = MaterialTheme.typography.labelSmall)
                         Text(diagnostics, style = MaterialTheme.typography.labelSmall)
                         Text(
-                            "Horizontal %.1f° (hinge %s)  ·  Vertical %.1f° (hinge %s)".format(
-                                horizontal, hingeHorizontal, vertical, hingeVertical
+                            "Horizontal %+.1f° (%s side farther)  ·  Vertical %+.1f° (%s side farther)".format(
+                                horizontal, awayHorizontal, vertical, awayVertical
                             ),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            "Both axes combine: a diagonal tilt lifts the opposite corner.",
+                            "The glass rotates about its centre; both axes combine and the near/far halves shift in opposite directions.",
                             style = MaterialTheme.typography.labelSmall
                         )
 
